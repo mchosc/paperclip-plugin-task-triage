@@ -212,6 +212,8 @@ const plugin = definePlugin({
                 createInput.assigneeAgentId = issue.assigneeAgentId;
               }
               const created = await ctx.issues.create(createInput as Parameters<typeof ctx.issues.create>[0]);
+              // API may ignore status on create — force to todo
+              try { await ctx.issues.update(created.id, { status: "todo" }, companyId); } catch { /* best effort */ }
               subtasksCreated.push(created.id);
               ctx.logger.info("Created subtask", {
                 title: sub.title,
