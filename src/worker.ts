@@ -338,6 +338,7 @@ const plugin = definePlugin({
       if (!issue || !issue.assigneeAgentId) return;
       if (issue.status !== "todo" && issue.status !== "in_progress") return;
       if (issue.parentId) return; // Don't triage subtasks
+      if (issue.title.startsWith("[Email]")) return; // Don't triage email tasks
 
       const agent = await ctx.agents.get(issue.assigneeAgentId, companyId);
       if (!agent) return;
@@ -366,6 +367,7 @@ const plugin = definePlugin({
       const issue = await ctx.issues.get(issueId, companyId);
       if (!issue || !issue.assigneeAgentId) return;
       if (issue.parentId) return; // Don't triage subtasks
+      if (issue.title.startsWith("[Email]")) return; // Don't triage email tasks
 
       const agent = await ctx.agents.get(issue.assigneeAgentId, companyId);
       if (!agent) return;
