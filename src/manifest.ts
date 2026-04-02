@@ -73,6 +73,18 @@ const manifest: PaperclipPluginManifestV1 = {
         title: "LLM API key (leave empty to use OPENAI_API_KEY env var)",
         default: "",
       },
+      routingRules: {
+        type: "array",
+        title: "Subtask routing rules (keyword → agent name). Leave empty for defaults.",
+        items: {
+          type: "object",
+          properties: {
+            pattern: { type: "string", title: "Regex pattern to match subtask title" },
+            agent: { type: "string", title: "Agent name to assign to" },
+          },
+        },
+        default: [],
+      },
     },
   },
   entrypoints: {

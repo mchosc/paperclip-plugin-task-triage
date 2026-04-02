@@ -1,6 +1,6 @@
 import { definePlugin, startWorkerRpcHost } from "@paperclipai/plugin-sdk";
 import type { Issue, Agent } from "@paperclipai/shared";
-import { assessComplexity, type ComplexityAssessment, type AgentRoster } from "./worker/complexity.js";
+import { assessComplexity, type ComplexityAssessment } from "./worker/complexity.js";
 import {
   type TriageState,
   type TriageRecord,
@@ -107,18 +107,6 @@ const plugin = definePlugin({
         // If block fails (e.g. already checked out), continue anyway
       }
 
-      // Build org roster dynamically for subtask routing
-      let orgRoster: AgentRoster[] | undefined;
-      try {
-        const allAgents = await ctx.agents.list({ companyId });
-        orgRoster = allAgents.map(a => ({
-          name: a.name,
-          role: a.role,
-          title: a.title ?? null,
-          reportsTo: a.reportsTo ? allAgents.find(x => x.id === a.reportsTo)?.name ?? null : null,
-        }));
-      } catch { /* proceed without roster */ }
-
       let assessment: ComplexityAssessment;
       try {
         assessment = await assessComplexity(
@@ -126,7 +114,6 @@ const plugin = definePlugin({
           { llmProvider: config.llmProvider, llmModel: config.llmModel, llmApiKey: apiKey },
           { title: issue.title, description: issue.description },
           { agentName: agent.name, maxTurns: getMaxTurns(agent) },
-          orgRoster,
         );
       } catch (err) {
         ctx.logger.error("Complexity assessment failed", {
@@ -159,19 +146,57 @@ const plugin = definePlugin({
         if (config.autoDecompose && assessment.suggestedSubtasks.length > 0) {
           // Issue is already blocked (from pre-assessment block above)
 
-          // Resolve agent names to IDs for assignee routing
+          // Resolve agents for keyword routing
           const allAgents = await ctx.agents.list({ companyId });
           const agentByName = new Map(allAgents.map((a) => [a.name.toLowerCase(), a]));
 
-          // Filter out email/report delivery subtasks — parent agent handles that
+          // Default routing rules — can be overridden via plugin config
+          const DEFAULT_ROUTING: Array<{ pattern: string; agent: string }> = [
+            { pattern: "security|audit|vulnerab|CVE", agent: "Sentinel" },
+            { pattern: "architect|design|system|refactor", agent: "Winston" },
+            { pattern: "code|implement|build|feature|bug|fix|engineer", agent: "Amelia" },
+            { pattern: "test|QA|regression|coverage", agent: "Murat" },
+            { pattern: "UX|UI|wireframe|usability|accessibility", agent: "Sally" },
+            { pattern: "prototype|MVP|quick build", agent: "Barry" },
+            { pattern: "tax|compliance|filing|IGIC", agent: "Audra" },
+            { pattern: "pricing|cost|margin|budget|financial", agent: "CFO - Oro" },
+            { pattern: "bookkeep|ledger|transaction", agent: "Malcolm" },
+            { pattern: "payroll|salary|RETA|labor", agent: "Nora" },
+            { pattern: "SEO|keyword|search.*rank", agent: "Atlas" },
+            { pattern: "content|editorial|blog|article", agent: "Iris" },
+            { pattern: "brand|visual|logo|design system", agent: "Muse" },
+            { pattern: "campaign|paid|ad.*creative", agent: "Dex" },
+            { pattern: "competitor|market.*research", agent: "Rex" },
+            { pattern: "sales|pitch|proposal", agent: "CMO - Marcus" },
+            { pattern: "legal|terms|policy|contract|engagement", agent: "Chaz" },
+            { pattern: "document|write|README|spec", agent: "Paige" },
+            { pattern: "research|investigate|analyze", agent: "Mary" },
+            { pattern: "product|roadmap|prioriti", agent: "John" },
+          ];
+          const routingRules = Array.isArray(config.routingRules) && config.routingRules.length > 0
+            ? config.routingRules as Array<{ pattern: string; agent: string }>
+            : DEFAULT_ROUTING;
+
+          // Filter out email/report delivery subtasks
           const EMAIL_PATTERNS = /email|report delivery|send report|compile report|final report|synthesis|consolidat/i;
           const filteredSubtasks = assessment.suggestedSubtasks.filter(
             (sub) => !EMAIL_PATTERNS.test(sub.title),
           );
 
-          // Auto-create subtasks with appropriate assignees
+          // Create subtasks with keyword-based routing
           for (const sub of filteredSubtasks) {
             try {
+              // Match subtask title against routing rules
+              let assigneeAgent: Agent | undefined;
+              for (const rule of routingRules) {
+                try {
+                  if (new RegExp(rule.pattern, "i").test(sub.title)) {
+                    assigneeAgent = agentByName.get(rule.agent.toLowerCase());
+                    if (assigneeAgent) break;
+                  }
+                } catch { /* invalid regex — skip */ }
+              }
+
               const createInput: Record<string, unknown> = {
                 companyId,
                 parentId: issue.id,
@@ -181,15 +206,17 @@ const plugin = definePlugin({
                 status: "todo",
               };
               if (issue.projectId) createInput.projectId = issue.projectId;
-              // Assign to suggested agent, fall back to parent assignee
-              const suggestedAgent = sub.assignee ? agentByName.get(sub.assignee.toLowerCase()) : null;
-              if (suggestedAgent) {
-                createInput.assigneeAgentId = suggestedAgent.id;
+              if (assigneeAgent) {
+                createInput.assigneeAgentId = assigneeAgent.id;
               } else if (issue.assigneeAgentId) {
                 createInput.assigneeAgentId = issue.assigneeAgentId;
               }
               const created = await ctx.issues.create(createInput as Parameters<typeof ctx.issues.create>[0]);
               subtasksCreated.push(created.id);
+              ctx.logger.info("Created subtask", {
+                title: sub.title,
+                assignee: assigneeAgent?.name ?? "parent assignee",
+              });
             } catch (err) {
               ctx.logger.error("Failed to create subtask", {
                 parent: issue.identifier,
