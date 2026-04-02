@@ -80,6 +80,7 @@ Rate complexity 1-10 where:
 
 If complexity >= 7, suggest how to break it into 2-5 smaller subtasks.
 ${orgSection ? `For each subtask, suggest the best agent to handle it from this org:\n${orgSection}` : "For each subtask, suggest an assignee role (e.g. 'engineer', 'designer', 'analyst')."}
+Do NOT include email delivery, report compilation, or final synthesis as subtasks — the parent agent handles that after all subtasks complete.
 Estimate how many LLM tool-loop turns this would take.
 
 JSON format:

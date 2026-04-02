@@ -163,8 +163,14 @@ const plugin = definePlugin({
           const allAgents = await ctx.agents.list({ companyId });
           const agentByName = new Map(allAgents.map((a) => [a.name.toLowerCase(), a]));
 
+          // Filter out email/report delivery subtasks — parent agent handles that
+          const EMAIL_PATTERNS = /email|report delivery|send report|compile report|final report|synthesis|consolidat/i;
+          const filteredSubtasks = assessment.suggestedSubtasks.filter(
+            (sub) => !EMAIL_PATTERNS.test(sub.title),
+          );
+
           // Auto-create subtasks with appropriate assignees
-          for (const sub of assessment.suggestedSubtasks) {
+          for (const sub of filteredSubtasks) {
             try {
               const createInput: Record<string, unknown> = {
                 companyId,
