@@ -18,6 +18,7 @@ interface PluginConfig {
   llmProvider: string;
   llmModel: string;
   llmApiKey: string;
+  llmFallbackModel: string;
 }
 
 const DEFAULT_CONFIG: PluginConfig = {
@@ -29,6 +30,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   llmProvider: "https://openrouter.ai/api/v1",
   llmModel: "deepseek/deepseek-v3.2",
   llmApiKey: "",
+  llmFallbackModel: "google/gemini-2.5-flash",
 };
 
 function resolveConfig(raw: Record<string, unknown> | null): PluginConfig {
@@ -111,7 +113,7 @@ const plugin = definePlugin({
       try {
         assessment = await assessComplexity(
           ctx.http.fetch.bind(ctx.http),
-          { llmProvider: config.llmProvider, llmModel: config.llmModel, llmApiKey: apiKey },
+          { llmProvider: config.llmProvider, llmModel: config.llmModel, llmApiKey: apiKey, llmFallbackModel: config.llmFallbackModel },
           { title: issue.title, description: issue.description },
           { agentName: agent.name, maxTurns: getMaxTurns(agent) },
         );

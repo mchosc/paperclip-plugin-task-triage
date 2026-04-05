@@ -10,9 +10,13 @@ export interface ComplexityAssessment {
   estimatedTurns: number;
 }
 
+function isQuotaError(msg: string): boolean {
+  return /429|rate.?limit|quota|resource.?exhausted|capacity|overloaded|too many requests/i.test(msg);
+}
+
 export async function assessComplexity(
   httpFetch: (url: string, init?: RequestInit) => Promise<Response>,
-  config: { llmProvider: string; llmModel: string; llmApiKey: string },
+  config: { llmProvider: string; llmModel: string; llmApiKey: string; llmFallbackModel?: string },
   issue: { title: string; description: string | null },
   agentContext: { agentName: string; maxTurns: number },
 ): Promise<ComplexityAssessment> {
@@ -41,38 +45,55 @@ JSON format:
 }`;
 
   let content: string | undefined;
-  const MAX_RETRIES = 3;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await httpFetch(`${config.llmProvider}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.llmApiKey}`,
-        },
-        body: JSON.stringify({
-          model: config.llmModel,
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.2,
-          max_tokens: 1024,
-        }),
-      });
+  const modelsToTry = [config.llmModel];
+  if (config.llmFallbackModel && config.llmFallbackModel !== config.llmModel) {
+    modelsToTry.push(config.llmFallbackModel);
+  }
 
-      if (!response.ok) {
-        throw new Error(`LLM API error: ${response.status} ${response.statusText}`);
+  const MAX_RETRIES = 2;
+  for (const model of modelsToTry) {
+    let succeeded = false;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await httpFetch(`${config.llmProvider}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.llmApiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.2,
+            max_tokens: 1024,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = `LLM API error: ${response.status} ${response.statusText}`;
+          if (isQuotaError(errText)) throw new Error(errText);
+          throw new Error(errText);
+        }
+
+        const data = (await response.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+
+        content = data.choices?.[0]?.message?.content?.trim();
+        if (!content) throw new Error("Empty LLM response");
+        succeeded = true;
+        break;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (isQuotaError(msg) && modelsToTry.indexOf(model) < modelsToTry.length - 1) break; // try next model
+        if (attempt === MAX_RETRIES) {
+          if (modelsToTry.indexOf(model) < modelsToTry.length - 1) break; // try next model
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, attempt * 2000));
       }
-
-      const data = (await response.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-
-      content = data.choices?.[0]?.message?.content?.trim();
-      if (!content) throw new Error("Empty LLM response");
-      break;
-    } catch (err) {
-      if (attempt === MAX_RETRIES) throw err;
-      await new Promise((r) => setTimeout(r, attempt * 2000));
     }
+    if (succeeded) break;
   }
 
   if (!content) throw new Error("LLM assessment failed after retries");
