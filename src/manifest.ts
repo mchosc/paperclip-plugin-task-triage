@@ -68,6 +68,11 @@ const manifest: PaperclipPluginManifestV1 = {
         title: "LLM model for complexity assessment",
         default: "deepseek/deepseek-v3.2",
       },
+      llmFallbackModel: {
+        type: "string",
+        title: "Fallback model (used when primary hits rate limits)",
+        default: "google/gemini-2.5-flash",
+      },
       llmApiKey: {
         type: "string",
         title: "LLM API key (leave empty to use OPENAI_API_KEY env var)",
