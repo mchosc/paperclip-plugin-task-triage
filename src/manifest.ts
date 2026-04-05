@@ -58,6 +58,12 @@ const manifest: PaperclipPluginManifestV1 = {
         title: "Consecutive failures before escalation",
         default: 2,
       },
+      exemptAgentNames: {
+        type: "string",
+        title: "Exempt agents (skip triage)",
+        description: "Comma-separated agent names that should never be triaged or decomposed (e.g., Hermes, Comms)",
+        default: "Hermes",
+      },
       llmProvider: {
         type: "string",
         title: "LLM provider URL for complexity assessment",
