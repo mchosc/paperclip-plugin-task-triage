@@ -19,7 +19,6 @@ interface PluginConfig {
   llmModel: string;
   llmApiKey: string;
   llmFallbackModel: string;
-  exemptAgentNames: string;
 }
 
 const DEFAULT_CONFIG: PluginConfig = {
@@ -32,7 +31,6 @@ const DEFAULT_CONFIG: PluginConfig = {
   llmModel: "deepseek/deepseek-v3.2",
   llmApiKey: "",
   llmFallbackModel: "google/gemini-2.5-flash",
-  exemptAgentNames: "Hermes",
 };
 
 function resolveConfig(raw: Record<string, unknown> | null): PluginConfig {
@@ -347,12 +345,6 @@ const plugin = definePlugin({
       const agent = await ctx.agents.get(issue.assigneeAgentId, companyId);
       if (!agent) return;
 
-      // Check agent exemption list
-      const exemptSet = new Set(config.exemptAgentNames.split(",").map(n => n.trim().toLowerCase()).filter(Boolean));
-      if (exemptSet.has((agent.name || "").toLowerCase())) {
-        ctx.logger.debug("Skipping triage (exempt agent)", { agent: agent.name });
-        return;
-      }
 
       // Check if already triaged
       const state = await loadState(companyId);
@@ -383,12 +375,6 @@ const plugin = definePlugin({
       const agent = await ctx.agents.get(issue.assigneeAgentId, companyId);
       if (!agent) return;
 
-      // Check agent exemption list
-      const exemptSet = new Set(config.exemptAgentNames.split(",").map(n => n.trim().toLowerCase()).filter(Boolean));
-      if (exemptSet.has((agent.name || "").toLowerCase())) {
-        ctx.logger.debug("Skipping triage (exempt agent)", { agent: agent.name });
-        return;
-      }
 
       const state = await loadState(companyId);
       const record = await triageIssue(issue, agent, companyId, config);
