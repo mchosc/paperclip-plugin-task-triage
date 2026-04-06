@@ -73,11 +73,6 @@ const manifest: PaperclipPluginManifestV1 = {
         title: "Fallback model (used when primary hits rate limits)",
         default: "google/gemini-2.5-flash",
       },
-      llmApiKey: {
-        type: "string",
-        title: "LLM API key (leave empty to use OPENAI_API_KEY env var)",
-        default: "",
-      },
       routingRules: {
         type: "array",
         title: "Subtask routing rules (keyword → agent name). Leave empty for defaults.",
