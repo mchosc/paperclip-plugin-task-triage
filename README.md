@@ -12,6 +12,8 @@ When a new issue is created or assigned to an agent, this plugin:
 4. If score >= threshold: **auto-decomposes** into 2-5 subtasks with smart assignee routing based on your org structure
 5. On agent failures: **tracks consecutive failures** and escalates to the agent's manager after N failures
 
+This now applies to email-delivery issues too; `[Email]` titles are no longer excluded from triage.
+
 ## Features
 
 - **Complexity scoring** — LLM-based 1-10 assessment with reasoning

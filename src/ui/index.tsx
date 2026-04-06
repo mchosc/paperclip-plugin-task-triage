@@ -104,11 +104,11 @@ function TimeAgo({ date }: { date: string }) {
 
 export function TriageOverviewWidget() {
   const context = useHostContext();
-  const { data, isLoading } = usePluginData<TriageState>("triage-overview", {
+  const { data, loading } = usePluginData<TriageState>("triage-overview", {
     companyId: context.companyId,
   });
 
-  if (isLoading || !data) {
+  if (loading || !data) {
     return <div style={{ padding: 16, opacity: 0.5, fontSize: 13 }}>Loading triage data...</div>;
   }
 
@@ -208,7 +208,7 @@ export function TriageOverviewWidget() {
 // ── Issue Detail Tab ──────────────────────────────────────────────────
 
 export function TriageIssueTab({ context }: PluginDetailTabProps) {
-  const { data, isLoading } = usePluginData<{
+  const { data, loading } = usePluginData<{
     triageRecord: TriageRecord | null;
     failureRecord: FailureRecord | null;
   }>("triage-issue", {
@@ -235,7 +235,7 @@ export function TriageIssueTab({ context }: PluginDetailTabProps) {
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return <div style={{ padding: 16, opacity: 0.5, fontSize: 13 }}>Loading...</div>;
   }
 

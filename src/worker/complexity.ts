@@ -6,7 +6,7 @@
 export interface ComplexityAssessment {
   score: number; // 1-10
   reasoning: string;
-  suggestedSubtasks: Array<{ title: string; description: string }>;
+  suggestedSubtasks: Array<{ title: string; description: string; assignee?: string }>;
   estimatedTurns: number;
 }
 
