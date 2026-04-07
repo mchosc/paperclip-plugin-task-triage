@@ -18,12 +18,34 @@ This now applies to email-delivery issues too; `[Email]` titles are no longer ex
 
 - **Complexity scoring** — LLM-based 1-10 assessment with reasoning
 - **Auto-decomposition** — creates proper parent-child subtasks with assignees
+- **Subtask context inheritance** — when decomposing, each subtask description embeds the parent's full description verbatim under a `## Original task context` section (capped at 12 KB), so subtask agents see the original rules and conventions instead of just the LLM's 1-line "brief". Fixes wrong-output bugs where decomposed subtasks would lose the parent's format strings, naming conventions, and constraints.
+- **Per-task / per-routine opt-out** — issues and routines can be created with `disableTriage: true` to skip triage entirely (no auto-block, no scoring, no decomposition). Use for deterministic operational tasks whose instructions are self-contained. Routines propagate the flag to every issue they fire.
 - **Smart routing** — reads your org chart dynamically, assigns subtasks to the right specialist (not managers)
 - **Pre-assessment blocking** — prevents race conditions where agents start before decomposition completes
 - **Failure escalation** — tracks timeouts/failures per issue, notifies managers after consecutive failures
 - **Dashboard widget** — shows assessment history, active escalations, stats
 - **Issue detail tab** — shows complexity score and failure tracking per issue
 - **Manual triage** — "Assess Complexity" button on any issue
+
+### Opting out of triage
+
+Two ways to set the `disableTriage` flag:
+
+```bash
+# On a routine — every issue it fires inherits the flag automatically
+curl -X PATCH http://localhost:3100/api/routines/{id} \
+  -H "Content-Type: application/json" \
+  -d '{"disableTriage": true}'
+
+# On a single issue at creation time
+curl -X POST http://localhost:3100/api/companies/{companyId}/issues \
+  -H "Content-Type: application/json" \
+  -d '{"title": "...", "disableTriage": true, ...}'
+```
+
+In the UI, both the routine creation dialog and the New Issue dialog have a "Skip task triage" checkbox.
+
+When the plugin sees `issue.disableTriage === true` in its `issue.created` handler, it logs `Skipping triage (disableTriage flag set)` and returns immediately — no DB writes, no LLM calls, no events.
 
 ## Installation
 

@@ -200,11 +200,28 @@ const plugin = definePlugin({
                 } catch { /* invalid regex — skip */ }
               }
 
+              // Build subtask description with parent context preserved verbatim.
+              // The decomposition LLM only writes a 1-line brief; without this,
+              // the agent running the subtask never sees the parent's rules
+              // and conventions and ends up guessing the format.
+              const PARENT_CONTEXT_MAX = 12000;
+              const parentDesc = (issue.description ?? "").trim();
+              const truncatedParent = parentDesc.length > PARENT_CONTEXT_MAX
+                ? parentDesc.slice(0, PARENT_CONTEXT_MAX) + "\n\n[... parent description truncated]"
+                : parentDesc;
+              const subtaskDescription = parentDesc
+                ? `## Original task context (from parent ${issue.identifier ?? issue.id})\n\n` +
+                  `The conventions, rules, and constraints below come from the parent task. ` +
+                  `**You must follow them** — they are not summarized in your subtask brief below.\n\n` +
+                  `---\n${truncatedParent}\n---\n\n` +
+                  `## Your specific subtask\n\n${sub.description}`
+                : sub.description;
+
               const createInput: Record<string, unknown> = {
                 companyId,
                 parentId: issue.id,
                 title: sub.title,
-                description: sub.description,
+                description: subtaskDescription,
                 priority: issue.priority,
                 status: "todo",
               };
@@ -370,6 +387,12 @@ const plugin = definePlugin({
       const issue = await ctx.issues.get(issueId, companyId);
       if (!issue || !issue.assigneeAgentId) return;
       if (issue.parentId) return; // Don't triage subtasks
+      if ((issue as { disableTriage?: boolean }).disableTriage === true) {
+        ctx.logger.info("Skipping triage (disableTriage flag set)", {
+          issue: issue.identifier,
+        });
+        return;
+      }
 
       const agent = await ctx.agents.get(issue.assigneeAgentId, companyId);
       if (!agent) return;
